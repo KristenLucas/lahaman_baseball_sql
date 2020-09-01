@@ -1,4 +1,20 @@
+-- For reference, from Mark.
+
+-- select t.table_schema,
+--        t.table_name
+-- from information_schema.tables t
+-- inner join information_schema.columns c on c.table_name = t.table_name
+--                                 and c.table_schema = t.table_schema
+-- where c.column_name ilike= '%name%'
+--       and t.table_schema not in ('information_schema', 'pg_catalog')
+--       and t.table_type = 'BASE TABLE'
+-- order by t.table_schema;
+
+
+
 ---------------------------------------------------------------------------------
+
+
 
 -- Q1. What range of years does the provided database cover?
 
@@ -10,7 +26,11 @@ FROM batting
 
 -- A. 1864-2014 (in collegeplaying), 1871-2016 (the website says 2019 for batting, but the data dictionary says 2016)
 
+
+
 ---------------------------------------------------------------------------------
+
+
 
 -- Q2. Find the name and height of the shortest player in the database. How many games did he play in? What is the name of the team for which he played?
 
@@ -34,7 +54,11 @@ ORDER BY height
 
 -- A. Eddie Gaedel, 43 (I'm guessing inches), 52 games, St. Louis Browns
 
+
+
 ----------------------------------------------------------------------------------
+
+
 
 /* Q3. Find all players in the database who played at Vanderbilt University. Create a list showing each 
 	player’s first and last names as well as the total salary they earned in the major leagues. 
@@ -74,7 +98,11 @@ ORDER BY total_salary DESC
 
 -- A. David Price with $245,553,888
 
+
+
 -------------------------------------------------------------------------------------
+
+
 
 /* Q4. Using the fielding table, group players into three groups based on their position: 
 	label players with position OF as "Outfield", those with position "SS", "1B", "2B", and "3B" as "Infield", and those with position "P" or "C" as "Battery". 
@@ -99,7 +127,10 @@ GROUP BY position
 
 -- A. Battery = 41,424, Infield = 58,934, Outfield = 29,560
 
+
+
 -----------------------------------------------------------------------------------------
+
 
 
  /* Q5. Find the average number of strikeouts per game by decade since 1920. 
@@ -146,10 +177,14 @@ ORDER BY decade
 
 -- A. It certainly looks like on both accounts, the trend is going way up. Meaning more people are being struck out, but more people are hitting far.
 
+
+
 ------------------------------------------------------------------------------------
 
-/* Q6. Find the player who had the most success stealing bases in 2016, where success is measured 
-	as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) 
+
+
+/* Q6. Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. 
+	(A stolen base attempt results either in a stolen base or being caught stealing.) 
 	Consider only players who attempted at least 20 stolen bases. */
 
 SELECT *
@@ -158,4 +193,139 @@ FROM people
 SELECT *
 FROM batting
 
--- Thoughts... total attempts should be caught stealing (CS) + Stolen Bases (SB) from the batting table. 
+SELECT count(SB)
+from batting
+WHERE SB = 0
+
+
+-- Thoughts... total attempts should be Caught Stealing (CS) + Stolen Bases (SB) from the batting table, and that needs to be against stolen bases.
+
+SELECT namefirst, namelast, b.playerid, 
+	(SELECT SB FROM batting WHERE SB > 0) AS SBclean,
+	(SBclean/(CS + SBclean))*100 AS perc_attempts
+FROM batting AS b
+INNER JOIN people AS p
+ON b.playerid = p.playerid
+WHERE yearid = 2016
+	AND SB >= 20
+ORDER BY  DESC
+
+SELECT namefirst, namelast, b.playerid, 
+	ROUND(CAST(SB AS numeric)/(CAST(CS AS numeric) + CAST(SB AS numeric)), 2) AS perc_attempts
+FROM batting AS b
+INNER JOIN people AS p
+ON b.playerid = p.playerid
+WHERE yearid = 2016
+	AND SB >= 20
+GROUP BY SB, CS, namefirst, namelast, b.playerid
+ORDER BY perc_attempts DESC
+
+SELECT namefirst, namelast, b.playerid, 
+	to_char((CAST(SB AS numeric)/(CAST(CS AS numeric) + CAST(SB AS numeric)))*100, '99.99%') AS perc_attempts
+FROM batting AS b
+INNER JOIN people AS p
+ON b.playerid = p.playerid
+WHERE yearid = 2016
+	AND SB >= 20
+GROUP BY SB, CS, namefirst, namelast, b.playerid
+ORDER BY perc_attempts DESC
+
+-- A. Chris Owings with a 91.30% success rate of stealing bases in 2016.
+
+
+
+-----------------------------------------------------------------------------------------
+
+
+
+/* Q7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
+	What is the smallest number of wins for a team that did win the world series? 
+	Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. 
+	Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? 
+	What percentage of the time? */
+	
+-- Thoughts... Group by year, use teams table, selct the Wins (W) and world series win (wswin) which is 'Y' or 'N'
+
+SELECT *
+FROM teams
+
+
+SELECT *
+FROM teams
+WHERE yearid BETWEEN '1970' AND '2016'
+	AND wswin = 'N'
+
+
+SELECT name, max(w), yearid
+FROM teams
+WHERE yearid BETWEEN '1970' AND '2016'
+	AND wswin = 'N'
+GROUP BY name, yearid
+ORDER BY max
+
+
+SELECT *
+FROM teams
+WHERE yearid BETWEEN '1970' AND '2016'
+	AND wswin = 'Y'
+
+
+SELECT name, min(w), yearid
+FROM teams
+WHERE yearid BETWEEN '1970' AND '2016'
+	AND wswin = 'Y'
+GROUP BY name, yearid
+ORDER BY min
+
+-- Apparently there was a strike in 1981 and all the regular season games were cancelled.
+-- Max that did not win WS was the Blue Jays with 37 wins. Min who did win WS was the Dodgers with 63 wins
+
+
+SELECT name, w, yearid
+FROM teams
+WHERE yearid >= '1970' AND yearid <= '1980' AND yearid >= '1982' AND yearid <= '2016'
+	AND wswin = 'N'
+GROUP BY name, w, yearid
+ORDER BY yearid
+
+
+
+
+-- Below is what UrLeaka just posted and I am no where near this...............
+
+WITH winners as	(	SELECT teamid as champ, 
+				           yearid, w as champ_w
+	  				FROM teams
+	  				WHERE 	(wswin = 'Y')
+				 			AND (yearid BETWEEN 1970 AND 2016) ),
+max_wins as (	SELECT yearid, 
+			           max(w) as maxw
+	  			FROM teams
+	  			WHERE yearid BETWEEN 1970 AND 2016
+				GROUP BY yearid)
+SELECT 	COUNT(*) AS all_years,
+		COUNT(CASE WHEN champ_w = maxw THEN 'Yes' end) as max_wins_by_champ,
+		to_char((COUNT(CASE WHEN champ_w = maxw THEN 'Yes' end)/(COUNT(*))::real)*100,'99.99%') as Percent
+FROM 	winners LEFT JOIN max_wins
+		USING(yearid)
+
+--------------------------------------------------------------------------------------------
+
+
+
+/* Q8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 
+	(where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. 
+	Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance. */
+
+
+
+
+
+----------------------------------------------------------------------------------------------
+
+
+
+/* Q9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
+	Give their full name and the teams that they were managing when they won the award.
+	
+
