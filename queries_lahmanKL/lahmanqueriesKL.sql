@@ -291,7 +291,7 @@ ORDER BY yearid
 
 
 
--- Below is what UrLeaka just posted and I am no where near this...............
+-- Below is what UrLeaka just posted and I am no where near this. It honestly meakes me nervous for the accessment coming up because I'm not even close...............
 
 WITH winners as	(	SELECT teamid as champ, 
 				           yearid, w as champ_w
@@ -318,6 +318,56 @@ FROM 	winners LEFT JOIN max_wins
 	Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance. */
 
 
+-- Thoughts... obvs use the homegames table. I'll need to join to the teams table to get the team name and the park name since homegames only has their ids.
+
+SELECT *
+FROM homegames
+
+SELECT *
+FROM teams
+
+SELECT *
+FROM homegames
+WHERE year = 2016
+
+SELECT t.park, t.name, (h.attendance/h.games) as avg_attend
+FROM homegames as h
+INNER JOIN teams as t
+ON h.team = t.teamid AND h.year = t.yearid
+WHERE h.year = '2016'
+	AND h.games >= 10
+GROUP BY t.park, t.name, avg_attend
+ORDER BY avg_attend DESC
+LIMIT 5
+
+SELECT t.park, t.name, (h.attendance/h.games) as avg_attend
+FROM homegames as h
+INNER JOIN teams as t
+ON h.team = t.teamid AND h.year = t.yearid
+WHERE h.year = '2016'
+	AND h.games >= 10
+GROUP BY t.park, t.name, avg_attend
+ORDER BY avg_attend
+LIMIT 5
+
+-- From Mark below. Very interesting. I just don't think that the whole 'no park listed' thing is needed, at least for 2016.
+
+SELECT t.teamid,
+   	      t.name,
+		  COALESCE(t.park,'No park listed') as parkname,
+		  CASE WHEN SUM(h.games) <=0 THEN 0
+		  ELSE CAST(SUM(h.attendance/h.games) as float)		 
+		  END as average_attendance
+   FROM homegames h
+   LEFT JOIN teams t
+   ON h.team = t.teamid and h.year = t.yearid
+   WHERE h.games >= 10
+   AND h.year = '2016'
+   GROUP BY t.teamid,
+   	        t.name,
+		    t.park
+   ORDER BY 4 DESC
+   LIMIT 5;
 
 
 
@@ -326,6 +376,113 @@ FROM 	winners LEFT JOIN max_wins
 
 
 /* Q9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
-	Give their full name and the teams that they were managing when they won the award.
+	Give their full name and the teams that they were managing when they won the award. */
+
+-- Thoughts... I'll need to join awardsmanagers and people tables. 
+
+SELECT *
+FROM awardsmanagers as a
+-- SELECT lgid and need to join to people using playerid
+
+SELECT *
+FROM people as p 
+-- SELECT namefirst, namelast, and need to join to awardsmanagers using playerid
+
+SELECT *
+FROM teams as t
+-- SELECT name, join to people
+
+
+
+SELECT p.namefirst,
+		p.namelast,
+		t.name as team,
+		al.lgid as league
+	FROM ALData as al
+		LEFT JOIN people as p 
+		ON al.playerid = p.playerid
+			LEFT JOIN teams as t
+			ON al.yearid = t.yearid
+	ORDER BY al.yearid
 	
+UNION
+
+SELECT p.namefirst,
+		p.namelast,
+		t.name as team,
+		nl.lgid as league
+	FROM NLData as nl
+		LEFT JOIN people as p 
+		ON nl.playerid = p.playerid
+			LEFT JOIN teams as t
+			ON nl.yearid = t.yearid
+	ORDER BY nl.yearid
+
+--Mark's code below
+
+-- AL league award winners
+SELECT playerid, awardid, yearid,lgid
+into temp table ALData
+FROM public.awardsmanagers
+WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year'
+
+-- NL league award winners
+SELECT playerid, awardid, yearid,lgid
+into temp table NLData
+FROM public.awardsmanagers
+WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year'
+--    "leylaji99"
+--    "johnsda02"
+-- drop table ALData
+-- DROP table NLData
+ -- final data --
+	SELECT DISTINCT p.playerid,
+			CONCAT(p.namelast, ', ', p.namefirst) as ManagerName,
+			al.yearid,
+			al.lgid,
+			m.teamid,
+			t.name
+	 FROM ALData al 	
+		INNER JOIN people p
+			ON al.playerid = p.playerid
+		LEFT JOIN managers m
+			ON p.playerid = m.playerid
+				AND al.yearid = m.yearid
+				AND al.lgid = m.lgid
+		INNER JOIN  teams t
+			ON m.teamid = t.teamid
+	WHERE p.playerid IN (
+						SELECT playerid
+						FROM ALData
+						INTERSECT
+						SELECT playerid
+						FROM NLData
+						)
+UNION
+	
+	SELECT DISTINCT p.playerid,
+			CONCAT(p.namelast, ', ', p.namefirst) as ManagerName,
+			nl.yearid,
+			nl.lgid,
+			m.teamid,
+			t.name
+	 FROM NLData nl
+	INNER JOIN people p
+			ON nl.playerid = p.playerid
+		LEFT JOIN managers m
+			ON p.playerid = m.playerid
+				AND nl.yearid = m.yearid
+				AND nl.lgid = m.lgid
+		INNER JOIN  teams t
+			ON m.teamid = t.teamid
+				AND m.lgid = t.lgid
+				AND m.yearid = t.yearid
+	WHERE p.playerid IN (
+						SELECT playerid
+						FROM ALData
+						INTERSECT
+						SELECT playerid
+						FROM NLData
+						)
+	 ORDER BY managername, yearid ASC
 
