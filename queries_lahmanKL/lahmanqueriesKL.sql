@@ -384,6 +384,9 @@ SELECT *
 FROM awardsmanagers as a
 -- SELECT lgid and need to join to people using playerid
 
+SELECT * 
+FROM managers
+
 SELECT *
 FROM people as p 
 -- SELECT namefirst, namelast, and need to join to awardsmanagers using playerid
@@ -393,30 +396,53 @@ FROM teams as t
 -- SELECT name, join to people
 
 
-
-SELECT p.namefirst,
+--My query but using Mark's temp tables
+SELECT DISTINCT p.playerid,
+		p.namefirst,
 		p.namelast,
 		t.name as team,
 		al.lgid as league
 	FROM ALData as al
-		LEFT JOIN people as p 
+		INNER JOIN people as p 
 		ON al.playerid = p.playerid
-			LEFT JOIN teams as t
+		LEFT JOIN managers m
+			ON p.playerid = m.playerid
+				AND al.yearid = m.yearid
+				AND al.lgid = m.lgid
+			INNER JOIN teams as t
 			ON al.yearid = t.yearid
-	ORDER BY al.yearid
+		WHERE p.playerid IN (
+						SELECT playerid
+						FROM ALData
+						INTERSECT
+						SELECT playerid
+						FROM NLData
+						)
 	
 UNION
 
-SELECT p.namefirst,
+SELECT DISTINCT p.playerid,
+		p.namefirst,
 		p.namelast,
 		t.name as team,
 		nl.lgid as league
 	FROM NLData as nl
-		LEFT JOIN people as p 
+		INNER JOIN people as p 
 		ON nl.playerid = p.playerid
-			LEFT JOIN teams as t
+		LEFT JOIN managers m
+			ON p.playerid = m.playerid
+				AND nl.yearid = m.yearid
+				AND nl.lgid = m.lgid
+			INNER JOIN teams as t
 			ON nl.yearid = t.yearid
-	ORDER BY nl.yearid
+		WHERE p.playerid IN (
+						SELECT playerid
+						FROM ALData
+						INTERSECT
+						SELECT playerid
+						FROM NLData
+						) 
+	ORDER BY 
 
 --Mark's code below
 
@@ -486,3 +512,60 @@ UNION
 						)
 	 ORDER BY managername, yearid ASC
 
+-- A. Honestly, I can't get this one to work without stealing Mark's code. I don't know what to do.
+
+
+---------------------------------------------------------------------------------------------------
+
+
+/* Presentation ideas
+	Something about the very first year in baseball
+	Something about when women played, apparently they weren't major league and so therefore not included in this after some research.
+	Something about the guy who made the least rather than the most from Vandy in 2016
+	Or ranking all the players.
+*/
+
+SELECT *
+FROM teams
+WHERE yearid BETWEEN '1943' AND '1955'
+
+SELECT *
+FROM people
+WHERE debut > '1943-01-01'
+ORDER BY debut
+
+SELECT DISTINCT lgid
+FROM teams
+
+SELECT *
+FROM collegeplaying
+ORDER BY yearid
+
+SELECT COUNT(DISTINCT playerid)
+FROM collegeplaying
+-- 6575
+
+SELECT COUNT(DISTINCT playerid)
+FROM people
+-- 19112
+
+-- 19112-6575=12537
+
+SELECT DISTINCT p.playerid
+FROM collegeplaying AS c
+RIGHT JOIN people AS p
+ON p.playerid = c.playerid
+ORDER BY yearid
+
+---------------
+
+
+-- I think I'm gonna use this. I really don't know what else to do at this point!!! Need to see how many years each one played
+SELECT p.namefirst, p.namelast, cp.schoolid, SUM(s.salary) AS total_salary
+FROM people AS p
+	INNER JOIN collegeplaying as cp
+	ON p.playerid = cp.playerid
+		INNER JOIN salaries as s
+		ON cp.playerid = s.playerid
+GROUP BY p.namefirst, p.namelast, cp.schoolid
+ORDER BY total_salary DESC
