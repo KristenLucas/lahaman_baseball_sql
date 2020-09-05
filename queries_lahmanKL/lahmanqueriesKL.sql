@@ -43,13 +43,18 @@ FROM teams
 SELECT *
 FROM appearances
 
-SELECT height, namefirst, namelast, p.playerid, a.teamid, a.yearid, t.name, SUM(g_all)
+SELECT CONCAT(p.namefirst, ' ', namelast) as name, 
+		height, 
+		p.playerid, 
+		a.teamid, 
+		t.name, 
+		SUM(g_all) total_games
 FROM people AS p
 	INNER JOIN appearances AS a
 	ON p.playerid = a.playerid
 		INNER JOIN teams AS t
 		ON a.teamid = t.teamid
-GROUP BY a.yearid, height, namefirst, namelast, a.teamid, p.playerid, t.name
+GROUP BY height, namefirst, namelast, a.teamid, p.playerid, t.name
 ORDER BY height
 
 -- A. Eddie Gaedel, 43 (I'm guessing inches), 52 games, St. Louis Browns
@@ -220,14 +225,14 @@ WHERE yearid = 2016
 GROUP BY SB, CS, namefirst, namelast, b.playerid
 ORDER BY perc_attempts DESC
 
-SELECT namefirst, namelast, b.playerid, 
+SELECT CONCAT(namefirst, ' ', namelast) as player, 
 	to_char((CAST(SB AS numeric)/(CAST(CS AS numeric) + CAST(SB AS numeric)))*100, '99.99%') AS perc_attempts
 FROM batting AS b
 INNER JOIN people AS p
 ON b.playerid = p.playerid
 WHERE yearid = 2016
 	AND SB >= 20
-GROUP BY SB, CS, namefirst, namelast, b.playerid
+GROUP BY SB, CS, player
 ORDER BY perc_attempts DESC
 
 -- A. Chris Owings with a 91.30% success rate of stealing bases in 2016.
@@ -330,6 +335,7 @@ SELECT *
 FROM homegames
 WHERE year = 2016
 
+--Highest
 SELECT t.park, t.name, (h.attendance/h.games) as avg_attend
 FROM homegames as h
 INNER JOIN teams as t
@@ -340,6 +346,7 @@ GROUP BY t.park, t.name, avg_attend
 ORDER BY avg_attend DESC
 LIMIT 5
 
+--Lowest
 SELECT t.park, t.name, (h.attendance/h.games) as avg_attend
 FROM homegames as h
 INNER JOIN teams as t
